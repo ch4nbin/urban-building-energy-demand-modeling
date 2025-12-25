@@ -212,5 +212,5 @@ This project is provided as-is for educational and exploratory purposes.
 
 ## Contact
 
-For questions or suggestions, please open an issue on the GitHub repository.
+For questions or suggestions, please open an issue on the GitHub repository or contact cp5721@princeton.edu
 
