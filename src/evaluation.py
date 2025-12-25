@@ -137,7 +137,7 @@ def plot_predictions(y_true, y_pred, model_name, timestamps=None, save_path=None
     plt.show()
 
 
-def plot_all_predictions(predictions, y_test, timestamps=None, save_dir='plots'):
+def plot_all_predictions(predictions, y_test, timestamps=None, save_dir='plots', combined=True):
     """
     Plot predictions for all models.
     
@@ -151,18 +151,50 @@ def plot_all_predictions(predictions, y_test, timestamps=None, save_dir='plots')
         Timestamps for x-axis
     save_dir : str
         Directory to save plots
+    combined : bool
+        If True, create one combined plot with all models. If False, create separate plots.
     """
     save_dir = Path(save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
     
-    for model_name, y_pred in predictions.items():
-        plot_predictions(
-            y_test, 
-            y_pred, 
-            model_name,
-            timestamps=timestamps,
-            save_path=save_dir / f'{model_name}_predictions.png'
-        )
+    if combined and len(predictions) > 1:
+        # Create one combined plot with all models
+        plt.figure(figsize=(14, 6))
+        
+        # Use provided timestamps or create index
+        if timestamps is None:
+            timestamps = pd.date_range(start='2023-01-01', periods=len(y_test), freq='H')
+        
+        # Plot actual
+        plt.plot(timestamps, y_test, label='Actual', alpha=0.8, linewidth=2, color='black')
+        
+        # Plot predictions for each model
+        for model_name, y_pred in predictions.items():
+            # Clean up model name for display
+            display_name = model_name.replace('_', ' ').title()
+            plt.plot(timestamps, y_pred, label=f'Predicted ({display_name})', alpha=0.7, linewidth=1.5)
+        
+        plt.xlabel('Time', fontsize=12)
+        plt.ylabel('Energy Consumption (kWh)', fontsize=12)
+        plt.title('Energy Consumption: Actual vs Predicted (All Models)', fontsize=14, fontweight='bold')
+        plt.legend(fontsize=11)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        
+        save_path = save_dir / 'predictions_combined.png'
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Combined plot saved to {save_path}")
+        plt.show()
+    else:
+        # Create separate plots for each model
+        for model_name, y_pred in predictions.items():
+            plot_predictions(
+                y_test, 
+                y_pred, 
+                model_name,
+                timestamps=timestamps,
+                save_path=save_dir / f'{model_name}_predictions.png'
+            )
 
 
 def plot_residuals(y_true, y_pred, model_name, save_path=None):
@@ -251,17 +283,8 @@ def create_evaluation_report(models, X_test, y_test, timestamps=None, save_dir='
     
     # Create plots
     print("\nGenerating plots...")
-    plot_all_predictions(predictions, y_test, timestamps=timestamps, save_dir=save_dir)
-    
-    # Create residual plots for best model
-    best_model = results_df.loc[results_df['mae'].idxmin(), 'model']
-    print(f"\nCreating residual analysis for best model: {best_model}")
-    plot_residuals(
-        y_test,
-        predictions[best_model],
-        best_model,
-        save_path=save_dir / f'{best_model}_residuals.png'
-    )
+    # Create one combined plot showing all models
+    plot_all_predictions(predictions, y_test, timestamps=timestamps, save_dir=save_dir, combined=True)
     
     return results_df
 
