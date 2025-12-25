@@ -16,12 +16,32 @@ This analysis takes an exploratory approach, focusing on understanding the relat
 
 ### Data
 
-The project works with hourly energy consumption data combined with weather information. The dataset includes:
-- **Energy consumption** (kWh): Hourly building energy usage
-- **Temperature** (°C): Outdoor temperature
-- **Humidity** (%): Relative humidity
+The project supports multiple data sources:
 
-If a data file is not provided, the project generates synthetic data that mimics realistic patterns:
+#### ASHRAE Great Energy Predictor III (Recommended)
+The ASHRAE dataset from Kaggle contains over 20 million hourly energy meter readings from 2,380 meters across 1,448 buildings, combined with weather data. This is the primary dataset for time-series energy consumption analysis.
+
+**Download**: https://www.kaggle.com/c/ashrae-energy-prediction/data
+
+**Required files** (place in `data/` folder):
+- `train.csv`: Hourly energy consumption (meter readings)
+- `weather_train.csv`: Weather data (temperature, humidity, wind, etc.)
+- `building_metadata.csv`: Building characteristics
+
+#### UCI Building Energy Dataset
+The UCI Energy Efficiency dataset contains building characteristics and energy loads. Note: This dataset is not time-series data, so it's less suitable for hourly consumption forecasting. The ASHRAE dataset is recommended for this project.
+
+**Download**: https://archive.ics.uci.edu/dataset/242/energy+efficiency
+
+#### Custom CSV Files
+You can use your own data file with columns:
+- `timestamp`: DateTime string
+- `energy_consumption`: Numeric values (kWh)
+- `temperature`: Numeric values (°C)
+- `humidity`: Numeric values (%)
+
+#### Synthetic Data (Fallback)
+If no data file is provided, the project generates synthetic data that mimics realistic patterns:
 - Daily cycles (higher consumption during business hours)
 - Weekly cycles (lower consumption on weekends)
 - Seasonal variations
@@ -120,9 +140,17 @@ This will:
 4. Train models
 5. Evaluate and visualize results
 
-### Using Your Own Data
+### Using Real Datasets
 
-To use your own data file:
+#### ASHRAE Dataset (Recommended)
+1. Download the dataset from [Kaggle](https://www.kaggle.com/c/ashrae-energy-prediction/data)
+2. Place the following files in the `data/` directory:
+   - `train.csv`
+   - `weather_train.csv`
+   - `building_metadata.csv`
+3. Run the script - it will automatically detect and load ASHRAE data
+
+#### Custom CSV File
 1. Place your CSV file in the `data/` directory
 2. Ensure it has columns: `timestamp`, `energy_consumption`, `temperature`, `humidity`
 3. Modify `main.py` to specify the file path:
@@ -132,7 +160,7 @@ To use your own data file:
 
 ### Data Format
 
-Your CSV file should have the following structure:
+For custom CSV files, use the following structure:
 - `timestamp`: DateTime string (e.g., "2023-01-01 00:00:00")
 - `energy_consumption`: Numeric values (kWh)
 - `temperature`: Numeric values (°C)
@@ -212,5 +240,5 @@ This project is provided as-is for educational and exploratory purposes.
 
 ## Contact
 
-For questions or suggestions, please open an issue on the GitHub repository or contact cp5721@princeton.edu
+For questions or suggestions, please open an issue on the GitHub repository or contact cp5721@princeton.edu.
 

@@ -36,8 +36,15 @@ def main():
     print("\n" + "="*70)
     print("STEP 1: DATA PROCESSING")
     print("="*70)
-    data_file = None  # Set to path if you have a data file
-    df = prepare_data(file_path=data_file)
+    
+    # Data source options:
+    # - 'ashrae': ASHRAE dataset (place train.csv, weather_train.csv, building_metadata.csv in data/)
+    # - 'custom': Custom CSV file (specify file_path)
+    # - 'auto': Auto-detect (default, falls back to synthetic if no data found)
+    data_file = None  # Set to path if you have a custom CSV file
+    dataset_type = 'auto'  # Options: 'ashrae', 'custom', 'auto'
+    
+    df = prepare_data(file_path=data_file, dataset_type=dataset_type)
     
     # Step 2: Feature Engineering
     print("\n" + "="*70)
