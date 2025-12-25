@@ -3,9 +3,8 @@ Data Processing Module
 
 Handles loading, cleaning, and basic preprocessing of building energy and weather data.
 Supports:
-- ASHRAE Great Energy Predictor III (Kaggle)
-- UCI Building Energy Dataset
-- Custom CSV files
+- UCI Building Energy Dataset (.xlsx, .xls, .csv)
+- Custom CSV/Excel files
 - Synthetic data generation
 """
 
@@ -16,174 +15,140 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-def load_ashrae_data(train_path=None, weather_path=None, building_path=None):
-    """
-    Load ASHRAE Great Energy Predictor III dataset from Kaggle.
-    
-    The ASHRAE dataset consists of multiple files:
-    - train.csv: Hourly energy consumption (meter readings)
-    - weather_train.csv: Weather data
-    - building_metadata.csv: Building characteristics
-    
-    Download from: https://www.kaggle.com/c/ashrae-energy-prediction/data
-    
-    Parameters:
-    -----------
-    train_path : str or Path, optional
-        Path to train.csv file
-    weather_path : str or Path, optional
-        Path to weather_train.csv file
-    building_path : str or Path, optional
-        Path to building_metadata.csv file
-    
-    Returns:
-    --------
-    pd.DataFrame
-        Combined dataframe with energy, weather, and building data
-    """
-    data_dir = Path('data')
-    
-    # Try to find files if paths not provided
-    if train_path is None:
-        train_path = data_dir / 'train.csv'
-    if weather_path is None:
-        weather_path = data_dir / 'weather_train.csv'
-    if building_path is None:
-        building_path = data_dir / 'building_metadata.csv'
-    
-    train_path = Path(train_path)
-    weather_path = Path(weather_path)
-    building_path = Path(building_path)
-    
-    if not train_path.exists():
-        raise FileNotFoundError(
-            f"ASHRAE train.csv not found at {train_path}. "
-            "Please download from https://www.kaggle.com/c/ashrae-energy-prediction/data"
-        )
-    
-    print("Loading ASHRAE dataset...")
-    
-    # Load training data (energy consumption)
-    train_df = pd.read_csv(train_path)
-    print(f"Loaded {len(train_df):,} energy meter readings")
-    
-    # Load weather data
-    if weather_path.exists():
-        weather_df = pd.read_csv(weather_path)
-        print(f"Loaded weather data for {weather_df['site_id'].nunique()} sites")
-        
-        # Merge weather data
-        train_df = train_df.merge(weather_df, on=['site_id', 'timestamp'], how='left')
-    else:
-        print("Warning: weather_train.csv not found. Weather features will be missing.")
-    
-    # Load building metadata
-    if building_path.exists():
-        building_df = pd.read_csv(building_path)
-        print(f"Loaded metadata for {len(building_df)} buildings")
-        
-        # Merge building data
-        train_df = train_df.merge(building_df, on='building_id', how='left')
-    else:
-        print("Warning: building_metadata.csv not found. Building features will be missing.")
-    
-    # Convert timestamp
-    train_df['timestamp'] = pd.to_datetime(train_df['timestamp'])
-    
-    # Rename meter_reading to energy_consumption for consistency
-    if 'meter_reading' in train_df.columns:
-        train_df = train_df.rename(columns={'meter_reading': 'energy_consumption'})
-    
-    # For simplicity, aggregate to hourly building-level consumption
-    # (ASHRAE has multiple meters per building)
-    if 'building_id' in train_df.columns:
-        # Group by building and timestamp, sum energy consumption
-        df = train_df.groupby(['building_id', 'timestamp']).agg({
-            'energy_consumption': 'sum',
-            'air_temperature': 'mean',
-            'dew_temperature': 'mean',
-            'cloud_coverage': 'mean',
-            'sea_level_pressure': 'mean',
-            'wind_direction': 'mean',
-            'wind_speed': 'mean',
-            'precip_depth_1_hr': 'mean'
-        }).reset_index()
-        
-        # Use air_temperature as temperature, calculate humidity from dew point
-        if 'air_temperature' in df.columns:
-            df['temperature'] = df['air_temperature']
-        if 'dew_temperature' in df.columns and 'air_temperature' in df.columns:
-            # Approximate humidity from dew point and temperature
-            df['humidity'] = 100 * np.exp((17.27 * df['dew_temperature']) / (237.7 + df['dew_temperature'])) / \
-                            np.exp((17.27 * df['temperature']) / (237.7 + df['temperature']))
-            df['humidity'] = df['humidity'].clip(0, 100)
-        
-        # For single building analysis, select first building or aggregate all
-        if df['building_id'].nunique() > 1:
-            print(f"Dataset contains {df['building_id'].nunique()} buildings.")
-            print("Aggregating across all buildings for building-level analysis...")
-            df = df.groupby('timestamp').agg({
-                'energy_consumption': 'sum',
-                'temperature': 'mean',
-                'humidity': 'mean'
-            }).reset_index()
-        else:
-            # Single building - just use timestamp as index
-            df = df.set_index('timestamp')[['energy_consumption', 'temperature', 'humidity']]
-            df = df.reset_index()
-    else:
-        df = train_df
-    
-    # Set timestamp as index
-    if 'timestamp' in df.columns:
-        df = df.set_index('timestamp')
-    
-    print(f"Processed ASHRAE data: {len(df)} hourly records")
-    return df
-
-
 def load_uci_data(file_path=None):
     """
     Load UCI Energy Efficiency Dataset.
     
-    Note: UCI dataset is not time-series data (it's building characteristics),
-    so this function converts it to a format compatible with time-series analysis
-    by creating synthetic timestamps. For true time-series analysis, use ASHRAE data.
+    The UCI dataset contains building characteristics and energy loads.
+    Since it's not time-series data, we convert it to hourly time-series format
+    by creating timestamps and using the energy loads as consumption values.
     
     Download from: https://archive.ics.uci.edu/dataset/242/energy+efficiency
     
     Parameters:
     -----------
     file_path : str or Path, optional
-        Path to UCI dataset CSV file
+        Path to UCI dataset file (supports .xlsx, .xls, or .csv)
     
     Returns:
     --------
     pd.DataFrame
-        Processed dataframe
+        Processed dataframe with time-series format
     """
     data_dir = Path('data')
     
     if file_path is None:
-        file_path = data_dir / 'energy_efficiency.csv'
+        # Try to find UCI dataset file (check for .xlsx, .xls, or .csv)
+        possible_files = [
+            data_dir / 'energy_efficiency.xlsx',
+            data_dir / 'energy_efficiency.xls',
+            data_dir / 'energy_efficiency.csv',
+            data_dir / 'ENB2012_data.xlsx',  # Common UCI filename
+            data_dir / 'ENB2012_data.xls',
+        ]
+        
+        file_path = None
+        for pf in possible_files:
+            if pf.exists():
+                file_path = pf
+                break
+        
+        if file_path is None:
+            raise FileNotFoundError(
+                f"UCI dataset not found in {data_dir}. "
+                "Please place your .xlsx file in the data/ directory. "
+                "Download from https://archive.ics.uci.edu/dataset/242/energy+efficiency"
+            )
+    else:
+        file_path = Path(file_path)
+        if not file_path.exists():
+            raise FileNotFoundError(f"UCI dataset not found at {file_path}")
     
-    file_path = Path(file_path)
+    print(f"Loading UCI Energy Efficiency dataset from {file_path}...")
     
-    if not file_path.exists():
-        raise FileNotFoundError(
-            f"UCI dataset not found at {file_path}. "
-            "Download from https://archive.ics.uci.edu/dataset/242/energy+efficiency"
-        )
+    # Load based on file extension
+    if file_path.suffix.lower() in ['.xlsx', '.xls']:
+        df = pd.read_excel(file_path)
+    else:
+        df = pd.read_csv(file_path)
     
-    print("Loading UCI Energy Efficiency dataset...")
-    df = pd.read_csv(file_path)
+    print(f"Loaded {len(df)} records with {len(df.columns)} columns")
+    print(f"Columns: {list(df.columns)}")
     
-    # UCI dataset has building characteristics, not time-series
-    # For this project, we'll use ASHRAE instead
-    print("Warning: UCI dataset is not time-series data.")
-    print("For hourly energy consumption analysis, please use ASHRAE dataset.")
+    # UCI dataset typically has columns like:
+    # X1-X8: Building characteristics (relative compactness, surface area, etc.)
+    # Y1: Heating Load
+    # Y2: Cooling Load
     
-    return df
+    # Find energy consumption column (could be Y1, Y2, or heating/cooling load)
+    energy_col = None
+    for col in df.columns:
+        col_lower = str(col).lower()
+        if 'heating' in col_lower and 'load' in col_lower:
+            energy_col = col
+            break
+        elif 'cooling' in col_lower and 'load' in col_lower:
+            energy_col = col
+            break
+        elif col in ['Y1', 'Y2', 'heating_load', 'cooling_load']:
+            energy_col = col
+            break
+    
+    # If no specific column found, use Y1 (heating load) or first numeric column
+    if energy_col is None:
+        if 'Y1' in df.columns:
+            energy_col = 'Y1'
+        elif 'Y2' in df.columns:
+            energy_col = 'Y2'
+        else:
+            # Use first numeric column that looks like energy
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            if len(numeric_cols) > 0:
+                energy_col = numeric_cols[-1]  # Usually last column is target
+            else:
+                raise ValueError("Could not find energy consumption column in UCI dataset")
+    
+    print(f"Using '{energy_col}' as energy consumption column")
+    
+    # Create time-series format by assigning hourly timestamps
+    # Each building record becomes one hour of data
+    n_records = len(df)
+    start_date = pd.Timestamp('2023-01-01 00:00:00')
+    timestamps = pd.date_range(start=start_date, periods=n_records, freq='H')
+    
+    # Create time-series dataframe
+    result_df = pd.DataFrame({
+        'timestamp': timestamps,
+        'energy_consumption': df[energy_col].values
+    })
+    
+    # Add temperature if available (UCI doesn't have weather, so we'll generate realistic values)
+    # Or try to find temperature-related columns
+    temp_col = None
+    for col in df.columns:
+        col_lower = str(col).lower()
+        if 'temp' in col_lower or 'temperature' in col_lower:
+            temp_col = col
+            break
+    
+    if temp_col:
+        result_df['temperature'] = df[temp_col].values
+    else:
+        # Generate realistic temperature based on seasonal patterns
+        day_of_year = timestamps.dayofyear
+        result_df['temperature'] = 20 + 10 * np.sin(2 * np.pi * day_of_year / 365.25) + np.random.normal(0, 2, n_records)
+    
+    # Add humidity (UCI doesn't have this, generate realistic values)
+    result_df['humidity'] = 60 - 0.5 * result_df['temperature'] + np.random.normal(0, 5, n_records)
+    result_df['humidity'] = result_df['humidity'].clip(20, 90)
+    
+    # Set timestamp as index
+    result_df = result_df.set_index('timestamp')
+    
+    print(f"Converted to time-series format: {len(result_df)} hourly records")
+    print(f"Energy consumption range: {result_df['energy_consumption'].min():.2f} - {result_df['energy_consumption'].max():.2f}")
+    
+    return result_df
 
 
 def load_data(file_path=None, dataset_type='auto'):
@@ -191,16 +156,16 @@ def load_data(file_path=None, dataset_type='auto'):
     Load building energy and weather data from various sources.
     
     Supports:
-    - ASHRAE dataset (from Kaggle)
+    - UCI Building Energy Dataset (.xlsx, .xls, .csv)
     - Custom CSV files
     - Synthetic data generation (fallback)
     
     Parameters:
     -----------
     file_path : str or Path, optional
-        Path to data file or directory containing ASHRAE files
+        Path to data file
     dataset_type : str
-        Type of dataset: 'ashrae', 'uci', 'custom', or 'auto' (auto-detect)
+        Type of dataset: 'uci', 'custom', or 'auto' (auto-detect)
     
     Returns:
     --------
@@ -211,26 +176,33 @@ def load_data(file_path=None, dataset_type='auto'):
     
     # Auto-detect dataset type
     if dataset_type == 'auto':
-        if (data_dir / 'train.csv').exists():
-            dataset_type = 'ashrae'
+        # Check for UCI dataset files
+        uci_files = list(data_dir.glob('*.xlsx')) + list(data_dir.glob('*.xls')) + \
+                    list(data_dir.glob('energy_efficiency.*'))
+        if uci_files:
+            dataset_type = 'uci'
         elif file_path and Path(file_path).exists():
             dataset_type = 'custom'
         else:
             dataset_type = 'synthetic'
     
-    # Load ASHRAE dataset
-    if dataset_type == 'ashrae':
+    # Load UCI dataset
+    if dataset_type == 'uci':
         try:
-            return load_ashrae_data()
+            return load_uci_data(file_path=file_path)
         except FileNotFoundError as e:
-            print(f"ASHRAE dataset not found: {e}")
+            print(f"UCI dataset not found: {e}")
             print("Falling back to synthetic data generation...")
             return generate_synthetic_data()
     
     # Load custom CSV file
     if file_path and Path(file_path).exists():
         try:
-            df = pd.read_csv(file_path)
+            # Try to detect if it's Excel file
+            if Path(file_path).suffix.lower() in ['.xlsx', '.xls']:
+                df = pd.read_excel(file_path)
+            else:
+                df = pd.read_csv(file_path)
             print(f"Loaded data from {file_path}")
             return df
         except Exception as e:
@@ -241,9 +213,10 @@ def load_data(file_path=None, dataset_type='auto'):
     # Generate synthetic data
     print("No data file provided. Generating synthetic data...")
     print("To use real data:")
-    print("  1. ASHRAE: Download from https://www.kaggle.com/c/ashrae-energy-prediction/data")
-    print("     Place train.csv, weather_train.csv, and building_metadata.csv in data/ folder")
-    print("  2. Custom: Place your CSV file in data/ folder with columns: timestamp, energy_consumption, temperature, humidity")
+    print("  1. UCI: Place your .xlsx file in data/ folder")
+    print("     Download from https://archive.ics.uci.edu/dataset/242/energy+efficiency")
+    print("  2. Custom: Place your CSV/Excel file in data/ folder")
+    print("     Required columns: timestamp, energy_consumption, temperature, humidity")
     return generate_synthetic_data()
 
 
@@ -395,9 +368,9 @@ def prepare_data(file_path=None, dataset_type='auto'):
     Parameters:
     -----------
     file_path : str or Path, optional
-        Path to data file or directory
+        Path to data file
     dataset_type : str
-        Type of dataset: 'ashrae', 'custom', or 'auto' (auto-detect)
+        Type of dataset: 'uci', 'custom', or 'auto' (auto-detect)
     
     Returns:
     --------

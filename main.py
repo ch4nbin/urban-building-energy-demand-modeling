@@ -38,11 +38,11 @@ def main():
     print("="*70)
     
     # Data source options:
-    # - 'ashrae': ASHRAE dataset (place train.csv, weather_train.csv, building_metadata.csv in data/)
-    # - 'custom': Custom CSV file (specify file_path)
+    # - 'uci': UCI Building Energy Dataset (.xlsx file in data/ folder)
+    # - 'custom': Custom CSV/Excel file (specify file_path)
     # - 'auto': Auto-detect (default, falls back to synthetic if no data found)
-    data_file = None  # Set to path if you have a custom CSV file
-    dataset_type = 'auto'  # Options: 'ashrae', 'custom', 'auto'
+    data_file = None  # Set to path if you have a custom file
+    dataset_type = 'uci'  # Options: 'uci', 'custom', 'auto'
     
     df = prepare_data(file_path=data_file, dataset_type=dataset_type)
     

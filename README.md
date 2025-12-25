@@ -18,20 +18,12 @@ This analysis takes an exploratory approach, focusing on understanding the relat
 
 The project supports multiple data sources:
 
-#### ASHRAE Great Energy Predictor III (Recommended)
-The ASHRAE dataset from Kaggle contains over 20 million hourly energy meter readings from 2,380 meters across 1,448 buildings, combined with weather data. This is the primary dataset for time-series energy consumption analysis.
-
-**Download**: https://www.kaggle.com/c/ashrae-energy-prediction/data
-
-**Required files** (place in `data/` folder):
-- `train.csv`: Hourly energy consumption (meter readings)
-- `weather_train.csv`: Weather data (temperature, humidity, wind, etc.)
-- `building_metadata.csv`: Building characteristics
-
-#### UCI Building Energy Dataset
-The UCI Energy Efficiency dataset contains building characteristics and energy loads. Note: This dataset is not time-series data, so it's less suitable for hourly consumption forecasting. The ASHRAE dataset is recommended for this project.
+#### UCI Building Energy Dataset (Primary)
+The UCI Energy Efficiency dataset contains building characteristics and energy loads. The dataset is converted to time-series format for hourly consumption analysis.
 
 **Download**: https://archive.ics.uci.edu/dataset/242/energy+efficiency
+
+**File Format**: The dataset is typically provided as an Excel file (.xlsx). Place it in the `data/` folder.
 
 #### Custom CSV Files
 You can use your own data file with columns:
@@ -142,13 +134,29 @@ This will:
 
 ### Using Real Datasets
 
-#### ASHRAE Dataset (Recommended)
-1. Download the dataset from [Kaggle](https://www.kaggle.com/c/ashrae-energy-prediction/data)
-2. Place the following files in the `data/` directory:
-   - `train.csv`
-   - `weather_train.csv`
-   - `building_metadata.csv`
-3. Run the script - it will automatically detect and load ASHRAE data
+#### UCI Building Energy Dataset
+
+1. **Download the dataset**:
+   - Go to https://archive.ics.uci.edu/dataset/242/energy+efficiency
+   - Download the dataset (typically an Excel file, e.g., `ENB2012_data.xlsx`)
+
+2. **Place the file in the `data/` directory**:
+   ```bash
+   # Place your .xlsx file here:
+   data/energy_efficiency.xlsx
+   # or
+   data/ENB2012_data.xlsx
+   # or any .xlsx/.xls file in the data/ folder
+   ```
+
+3. **Run the script** - it will automatically detect and load the UCI dataset:
+   ```bash
+   python main.py
+   ```
+   
+   The script is configured to:
+   - Use `dataset_type='uci'` (default)
+   - Automatically find .xlsx/.xls files in the `data/` folder
 
 #### Custom CSV File
 1. Place your CSV file in the `data/` directory
